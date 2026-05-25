@@ -61,6 +61,13 @@ const ChatWidget = () => {
     setShowNewBadge(false);
   };
 
+  const loadMessages = useCallback(async (conversationId) => {
+    if (!conversationId) return;
+    const msgRes = await api.getConversationMessages(conversationId);
+    const msgs = msgRes.data || msgRes || [];
+    setMessages(Array.isArray(msgs) ? msgs : []);
+  }, []);
+
   // Initialize: fetch conversation + messages
   const initChat = useCallback(async () => {
     if (!isAuthenticated || isAdmin) return;
@@ -72,16 +79,14 @@ const ChatWidget = () => {
       setUnreadCount(convo?.unreadByUser || 0);
 
       if (convo?._id) {
-        const msgRes = await api.getConversationMessages(convo._id);
-        const msgs = msgRes.data || msgRes || [];
-        setMessages(Array.isArray(msgs) ? msgs : []);
+        await loadMessages(convo._id);
       }
     } catch (err) {
       console.error("Chat init error:", err);
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, isAdmin]);
+  }, [isAuthenticated, isAdmin, loadMessages]);
 
   // Socket setup
   useEffect(() => {
@@ -112,6 +117,11 @@ const ChatWidget = () => {
     const onConvoUpdate = (convo) => {
       setConversation(convo);
       if (!openRef.current) setUnreadCount(convo?.unreadByUser || 0);
+      if (convo?._id && convo._id === conversation?._id) {
+        loadMessages(convo._id).catch((err) =>
+          console.error("Chat reload error:", err)
+        );
+      }
     };
 
     const onTyping = ({ role, isTyping }) => {
@@ -131,7 +141,11 @@ const ChatWidget = () => {
       socket.off("chat:conversation-updated", onConvoUpdate);
       socket.off("chat:typing", onTyping);
     };
-  }, [isAuthenticated, isAdmin, initChat]);
+  }, [isAuthenticated, isAdmin, initChat, loadMessages, conversation?._id]);
+
+  useEffect(() => {
+    if (open) initChat();
+  }, [open, initChat]);
 
   // Join room when conversation available
   useEffect(() => {

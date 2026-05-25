@@ -3,6 +3,10 @@ const Message = require('../models/Message');
 const User = require('../models/User');
 const asyncHandler = require('../utils/asyncHandler');
 
+const ADMIN_ROOM = 'admins';
+const userRoom = (userId) => `user:${userId}`;
+const convoRoom = (convoId) => `convo:${convoId}`;
+
 // Helper: get or create conversation for a user
 const getOrCreateConversationForUser = async (userId) => {
   let conversation = await Conversation.findOne({ user: userId });
@@ -89,6 +93,24 @@ const sendMessage = asyncHandler(async (req, res) => {
     'sender',
     'name email role'
   );
+  const convoPopulated = await Conversation.findById(conversation._id).populate(
+    'user',
+    'name email'
+  );
+
+  const io = req.app.get('io');
+  if (io) {
+    io.to(convoRoom(conversation._id.toString()))
+      .to(userRoom(conversation.user.toString()))
+      .to(ADMIN_ROOM)
+      .emit('chat:message', populated);
+    io.to(ADMIN_ROOM).emit('chat:conversation-updated', convoPopulated);
+    io.to(userRoom(conversation.user.toString())).emit(
+      'chat:conversation-updated',
+      convoPopulated
+    );
+  }
+
   res.status(201).json({ success: true, data: populated });
 });
 

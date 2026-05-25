@@ -110,11 +110,12 @@ const initChatSocket = (io) => {
           'name email'
         );
 
-        // Emit new message to conversation room
-        io.to(convoRoom(conversation._id.toString())).emit(
-          'chat:message',
-          populated
-        );
+        // Emit to the conversation plus direct user/admin rooms so messages are
+        // delivered even if one side has not joined the conversation room yet.
+        io.to(convoRoom(conversation._id.toString()))
+          .to(userRoom(conversation.user.toString()))
+          .to(ADMIN_ROOM)
+          .emit('chat:message', populated);
 
         // Notify admins list + the user so their list updates
         io.to(ADMIN_ROOM).emit('chat:conversation-updated', convoPopulated);

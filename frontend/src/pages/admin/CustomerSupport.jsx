@@ -91,7 +91,9 @@ const CustomerSupport = () => {
     fetchConversations();
 
     const onMessage = (msg) => {
-      if (msg.conversation === activeIdRef.current) {
+      const messageConversationId =
+        typeof msg.conversation === "string" ? msg.conversation : msg.conversation?._id;
+      if (messageConversationId === activeIdRef.current) {
         setMessages((prev) => {
           if (prev.some((m) => m._id === msg._id)) return prev;
           return [...prev, msg];

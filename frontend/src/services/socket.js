@@ -6,18 +6,20 @@ const SOCKET_URL =
   "http://localhost:5000";
 
 let socket = null;
+let socketToken = null;
 
 export const getSocket = () => socket;
 
 export const connectSocket = (token) => {
   if (!token) return null;
-  if (socket && socket.connected) return socket;
+  if (socket && socket.connected && socketToken === token) return socket;
 
   if (socket) {
     socket.disconnect();
     socket = null;
   }
 
+  socketToken = token;
   socket = io(SOCKET_URL, {
     auth: { token },
     transports: ["websocket", "polling"],
@@ -36,4 +38,5 @@ export const disconnectSocket = () => {
     socket.disconnect();
     socket = null;
   }
+  socketToken = null;
 };
