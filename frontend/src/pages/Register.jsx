@@ -29,32 +29,32 @@ const Register = () => {
   const [apiError, setApiError] = useState("");
 
   const passwordRequirements = [
-    { label: "At least 8 characters", test: (p) => p.length >= 8 },
-    { label: "Contains uppercase letter", test: (p) => /[A-Z]/.test(p) },
-    { label: "Contains lowercase letter", test: (p) => /[a-z]/.test(p) },
-    { label: "Contains number", test: (p) => /[0-9]/.test(p) },
+    { label: "Ít nhất 8 ký tự", test: (p) => p.length >= 8 },
+    { label: "Có chữ cái viết hoa", test: (p) => /[A-Z]/.test(p) },
+    { label: "Có chữ cái viết thường", test: (p) => /[a-z]/.test(p) },
+    { label: "Có chữ số", test: (p) => /[0-9]/.test(p) },
   ];
 
   const validateForm = () => {
     const newErrors = {};
     if (!formData.name.trim()) {
-      newErrors.name = "Full name is required";
+      newErrors.name = "Vui lòng nhập họ và tên";
     }
     if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
+      newErrors.email = "Vui lòng nhập email";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email";
+      newErrors.email = "Email không hợp lệ";
     }
     if (!formData.phone.trim()) {
-      newErrors.phone = "Phone number is required";
+      newErrors.phone = "Vui lòng nhập số điện thoại";
     }
     if (!formData.password) {
-      newErrors.password = "Password is required";
+      newErrors.password = "Vui lòng nhập mật khẩu";
     } else if (formData.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
+      newErrors.password = "Mật khẩu phải có ít nhất 8 ký tự";
     }
     if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
+      newErrors.confirmPassword = "Mật khẩu xác nhận không khớp";
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -85,13 +85,13 @@ const Register = () => {
       });
 
       if (!result.success) {
-        setApiError(result.error || "Registration failed. Please try again.");
+        setApiError(result.error || "Đăng ký thất bại. Vui lòng thử lại.");
         return;
       }
 
       navigate("/");
     } catch (error) {
-      setApiError("Registration failed. Please try again.");
+      setApiError("Đăng ký thất bại. Vui lòng thử lại.");
     } finally {
       setIsLoading(false);
     }
@@ -114,23 +114,23 @@ const Register = () => {
             </div>
             <span className="text-2xl font-semibold">HotelBooking</span>
           </Link>
-          <h1 className="text-4xl font-bold mb-4">Join Us Today</h1>
+          <h1 className="text-4xl font-bold mb-4">Tham gia ngay hôm nay</h1>
           <p className="text-lg text-white/80 max-w-md">
-            Create an account to unlock exclusive deals, save your favorite
-            hotels, and manage your bookings with ease.
+            Tạo tài khoản để nhận ưu đãi thành viên, lưu khách sạn yêu thích
+            và quản lý đặt phòng dễ dàng hơn.
           </p>
           <div className="mt-8 space-y-4">
             <div className="flex items-center gap-3">
               <CheckCircle size={20} className="text-green-400" />
-              <span>Access to exclusive member deals</span>
+              <span>Nhận ưu đãi riêng cho thành viên</span>
             </div>
             <div className="flex items-center gap-3">
               <CheckCircle size={20} className="text-green-400" />
-              <span>Save and manage your bookings</span>
+              <span>Lưu và quản lý đặt phòng của bạn</span>
             </div>
             <div className="flex items-center gap-3">
               <CheckCircle size={20} className="text-green-400" />
-              <span>Earn rewards on every stay</span>
+              <span>Tích lũy quyền lợi sau mỗi kỳ lưu trú</span>
             </div>
           </div>
         </div>
@@ -153,9 +153,9 @@ const Register = () => {
           </Link>
 
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900">Create Account</h2>
+            <h2 className="text-3xl font-bold text-gray-900">Tạo tài khoản</h2>
             <p className="text-gray-500 mt-2">
-              Fill in your details to get started
+              Điền thông tin để bắt đầu sử dụng dịch vụ
             </p>
           </div>
 
@@ -172,7 +172,7 @@ const Register = () => {
                 htmlFor="name"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Full Name
+                Họ và tên
               </label>
               <div className="relative">
                 <User
@@ -190,7 +190,7 @@ const Register = () => {
                       ? "border-red-500 focus:ring-2 focus:ring-red-200"
                       : "border-gray-300 focus:ring-2 focus:ring-[#FF385C]/20 focus:border-[#FF385C]"
                   }`}
-                  placeholder="John Doe"
+                  placeholder="Nguyễn Văn A"
                 />
               </div>
               {errors.name && (
@@ -204,7 +204,7 @@ const Register = () => {
                 htmlFor="email"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Email Address
+                Địa chỉ email
               </label>
               <div className="relative">
                 <Mail
@@ -236,7 +236,7 @@ const Register = () => {
                 htmlFor="phone"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Phone Number
+                Số điện thoại
               </label>
               <div className="relative">
                 <Phone
@@ -254,7 +254,7 @@ const Register = () => {
                       ? "border-red-500 focus:ring-2 focus:ring-red-200"
                       : "border-gray-300 focus:ring-2 focus:ring-[#FF385C]/20 focus:border-[#FF385C]"
                   }`}
-                  placeholder="+1 234 567 890"
+                  placeholder="0900000000"
                 />
               </div>
               {errors.phone && (
@@ -268,7 +268,7 @@ const Register = () => {
                 htmlFor="password"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Password
+                Mật khẩu
               </label>
               <div className="relative">
                 <Lock
@@ -286,7 +286,7 @@ const Register = () => {
                       ? "border-red-500 focus:ring-2 focus:ring-red-200"
                       : "border-gray-300 focus:ring-2 focus:ring-[#FF385C]/20 focus:border-[#FF385C]"
                   }`}
-                  placeholder="Create a password"
+                  placeholder="Tạo mật khẩu"
                 />
                 <button
                   type="button"
@@ -326,7 +326,7 @@ const Register = () => {
                 htmlFor="confirmPassword"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Confirm Password
+                Xác nhận mật khẩu
               </label>
               <div className="relative">
                 <Lock
@@ -344,7 +344,7 @@ const Register = () => {
                       ? "border-red-500 focus:ring-2 focus:ring-red-200"
                       : "border-gray-300 focus:ring-2 focus:ring-[#FF385C]/20 focus:border-[#FF385C]"
                   }`}
-                  placeholder="Confirm your password"
+                  placeholder="Nhập lại mật khẩu"
                 />
                 <button
                   type="button"
@@ -374,13 +374,13 @@ const Register = () => {
                 required
               />
               <label htmlFor="terms" className="text-sm text-gray-600">
-                I agree to the{" "}
+                Tôi đồng ý với{" "}
                 <Link to="/terms" className="text-[#FF385C] hover:underline">
-                  Terms of Service
+                  Điều khoản dịch vụ
                 </Link>{" "}
-                and{" "}
+                và{" "}
                 <Link to="/privacy" className="text-[#FF385C] hover:underline">
-                  Privacy Policy
+                  Chính sách bảo mật
                 </Link>
               </label>
             </div>
@@ -394,22 +394,22 @@ const Register = () => {
               {isLoading ? (
                 <>
                   <Loader2 size={20} className="animate-spin" />
-                  Creating account...
+                  Đang tạo tài khoản...
                 </>
               ) : (
-                "Create Account"
+                "Tạo tài khoản"
               )}
             </button>
           </form>
 
           {/* Login Link */}
           <p className="text-center text-gray-600 mt-6">
-            Already have an account?{" "}
+            Đã có tài khoản?{" "}
             <Link
               to="/login"
               className="text-[#FF385C] font-medium hover:underline"
             >
-              Sign in
+              Đăng nhập
             </Link>
           </p>
         </div>
@@ -419,4 +419,3 @@ const Register = () => {
 };
 
 export default Register;
-

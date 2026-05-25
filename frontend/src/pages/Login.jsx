@@ -18,12 +18,12 @@ const Login = () => {
   const validateForm = () => {
     const newErrors = {};
     if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
+      newErrors.email = "Vui lòng nhập email";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email";
+      newErrors.email = "Email không hợp lệ";
     }
     if (!formData.password) {
-      newErrors.password = "Password is required";
+      newErrors.password = "Vui lòng nhập mật khẩu";
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -81,10 +81,10 @@ const Login = () => {
             </div>
             <span className="text-2xl font-semibold">HotelBooking</span>
           </Link>
-          <h1 className="text-4xl font-bold mb-4">Welcome Back</h1>
+          <h1 className="text-4xl font-bold mb-4">Chào mừng trở lại</h1>
           <p className="text-lg text-white/80 max-w-md">
-            Sign in to access your account, manage bookings, and discover
-            amazing hotels around the world.
+            Đăng nhập để quản lý đặt phòng, theo dõi chuyến đi và khám phá
+            những khách sạn phù hợp cho kỳ nghỉ của bạn.
           </p>
         </div>
       </div>
@@ -106,9 +106,9 @@ const Login = () => {
           </Link>
 
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900">Sign In</h2>
+            <h2 className="text-3xl font-bold text-gray-900">Đăng nhập</h2>
             <p className="text-gray-500 mt-2">
-              Enter your credentials to access your account
+              Nhập thông tin tài khoản để tiếp tục
             </p>
           </div>
 
@@ -125,7 +125,7 @@ const Login = () => {
                 htmlFor="email"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Email Address
+                Địa chỉ email
               </label>
               <div className="relative">
                 <Mail
@@ -157,7 +157,7 @@ const Login = () => {
                 htmlFor="password"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Password
+                Mật khẩu
               </label>
               <div className="relative">
                 <Lock
@@ -175,7 +175,7 @@ const Login = () => {
                       ? "border-red-500 focus:ring-2 focus:ring-red-200"
                       : "border-gray-300 focus:ring-2 focus:ring-[#FF385C]/20 focus:border-[#FF385C]"
                   }`}
-                  placeholder="Enter your password"
+                  placeholder="Nhập mật khẩu"
                 />
                 <button
                   type="button"
@@ -197,13 +197,13 @@ const Login = () => {
                   type="checkbox"
                   className="w-4 h-4 rounded border-gray-300 text-[#FF385C] focus:ring-[#FF385C]"
                 />
-                <span className="text-sm text-gray-600">Remember me</span>
+                <span className="text-sm text-gray-600">Ghi nhớ đăng nhập</span>
               </label>
               <Link
                 to="/forgot-password"
                 className="text-sm text-[#FF385C] hover:underline"
               >
-                Forgot password?
+                Quên mật khẩu?
               </Link>
             </div>
 
@@ -216,10 +216,10 @@ const Login = () => {
               {isLoading ? (
                 <>
                   <Loader2 size={20} className="animate-spin" />
-                  Signing in...
+                  Đang đăng nhập...
                 </>
               ) : (
-                "Sign In"
+                "Đăng nhập"
               )}
             </button>
           </form>
@@ -227,7 +227,7 @@ const Login = () => {
           {/* Divider */}
           <div className="flex items-center gap-4 my-6">
             <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-sm text-gray-400">or continue with</span>
+            <span className="text-sm text-gray-400">hoặc tiếp tục với</span>
             <div className="flex-1 h-px bg-gray-200" />
           </div>
 
@@ -266,12 +266,12 @@ const Login = () => {
 
           {/* Register Link */}
           <p className="text-center text-gray-600 mt-8">
-            Don't have an account?{" "}
+            Chưa có tài khoản?{" "}
             <Link
               to="/register"
               className="text-[#FF385C] font-medium hover:underline"
             >
-              Sign up
+              Đăng ký
             </Link>
           </p>
         </div>
