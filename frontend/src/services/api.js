@@ -178,6 +178,13 @@ class ApiService {
     });
   }
 
+  async createBookingPayment(id) {
+    return this.request(`/bookings/${id}/payments`, {
+      method: "POST",
+      auth: true,
+    });
+  }
+
   async getBookings(params = {}) {
     const query = new URLSearchParams(params).toString();
     return this.request(`/bookings?${query}`, { auth: true });

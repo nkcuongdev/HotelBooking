@@ -1,4 +1,5 @@
 import { Users, X } from 'lucide-react';
+import { formatVnd } from '../utils/currency';
 
 const rooms = [
   {
@@ -7,8 +8,8 @@ const rooms = [
     description: 'Spacious room with stunning ocean views, king-size bed, and private balcony.',
     image: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?q=80&w=1974',
     capacity: 2,
-    price: 250,
-    originalPrice: 320,
+    price: 2500000,
+    originalPrice: 3200000,
     totalRooms: 5,
     availableRooms: 3,
     amenities: ['King Bed', 'Ocean View', 'Balcony', 'Mini Bar'],
@@ -19,8 +20,8 @@ const rooms = [
     description: 'Luxurious suite with separate living area, jacuzzi, and panoramic views.',
     image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=2070',
     capacity: 4,
-    price: 450,
-    originalPrice: 550,
+    price: 4500000,
+    originalPrice: 5500000,
     totalRooms: 3,
     availableRooms: 2,
     amenities: ['2 King Beds', 'Living Room', 'Jacuzzi', 'Kitchen'],
@@ -31,8 +32,8 @@ const rooms = [
     description: 'Comfortable room with modern amenities, perfect for couples.',
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?q=80&w=2070',
     capacity: 2,
-    price: 150,
-    originalPrice: 180,
+    price: 1500000,
+    originalPrice: 1800000,
     totalRooms: 10,
     availableRooms: 8,
     amenities: ['Queen Bed', 'City View', 'Work Desk'],
@@ -43,7 +44,7 @@ const rooms = [
     description: 'Perfect for families with connecting rooms and child-friendly amenities.',
     image: 'https://images.unsplash.com/photo-1566665797739-1674de7a421a?q=80&w=1974',
     capacity: 6,
-    price: 380,
+    price: 3800000,
     originalPrice: null,
     totalRooms: 2,
     availableRooms: 0,
@@ -108,11 +109,11 @@ const RoomCard = ({ room, onBook, isSelected }) => {
         <div className="flex items-end justify-between pt-4 border-t border-gray-100">
           <div>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-gray-900">${price}</span>
+              <span className="text-2xl font-bold text-gray-900">{formatVnd(price)}</span>
               <span className="text-gray-500">/đêm</span>
             </div>
             {originalPrice && (
-              <span className="text-sm text-gray-400 line-through">${originalPrice}</span>
+              <span className="text-sm text-gray-400 line-through">{formatVnd(originalPrice)}</span>
             )}
           </div>
 

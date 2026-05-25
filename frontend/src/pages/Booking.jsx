@@ -18,37 +18,38 @@ import {
 import Navbar from "../components/Navbar";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { formatVnd } from "../utils/currency";
 
 const PAYMENT_OPTIONS = [
   {
     id: "pay_at_hotel",
     label: "Thanh toán tại khách sạn",
-    description: "Pay when you arrive",
+    description: "Thanh toán khi nhận phòng",
     icon: Banknote,
   },
   {
-    id: "credit_card",
-    label: "Credit / Debit Card",
-    description: "Visa, Mastercard, JCB",
+    id: "vnpay",
+    label: "VNPAY",
+    description: "ATM, QR, Visa, Mastercard, JCB",
     icon: CreditCard,
   },
   {
-    id: "paypal",
-    label: "PayPal",
-    description: "Pay with your PayPal account",
+    id: "momo",
+    label: "MoMo",
+    description: "Ví MoMo, QR hoặc ứng dụng MoMo",
     icon: Wallet,
   },
 ];
 
 const PAYMENT_METHOD_MAP = {
   pay_at_hotel: "cash",
-  credit_card: "credit_card",
-  paypal: "paypal",
+  vnpay: "vnpay",
+  momo: "momo",
 };
 
 const formatDate = (dateStr) => {
   if (!dateStr) return "N/A";
-  return new Date(dateStr).toLocaleDateString("en-US", {
+  return new Date(dateStr).toLocaleDateString("vi-VN", {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -100,8 +101,7 @@ const Booking = () => {
   const [fieldErrors, setFieldErrors] = useState({});
 
   const [formData, setFormData] = useState({
-    firstName: user?.name?.split(" ")[0] || "",
-    lastName: user?.name?.split(" ").slice(1).join(" ") || "",
+    fullName: user?.name || "",
     email: user?.email || "",
     phone: user?.phone || "",
   });
@@ -141,7 +141,7 @@ const Booking = () => {
           id: roomData._id || roomData.id,
           title: roomData.title || roomData.name || "Phòng",
           price: roomData.pricePerNight || roomData.price || 0,
-          beds: roomData.beds || `${roomData.maxPeople || 2} guests`,
+          beds: roomData.beds || `${roomData.maxPeople || 2} khách`,
         });
       } catch (err) {
         setDataError(err.message || "Không thể tải thông tin đặt phòng");
@@ -163,12 +163,11 @@ const Booking = () => {
 
   const validate = () => {
     const errors = {};
-    if (!formData.firstName.trim()) errors.firstName = "First name is required";
-    if (!formData.lastName.trim()) errors.lastName = "Last name is required";
-    if (!formData.email.trim()) errors.email = "Email is required";
+    if (!formData.fullName.trim()) errors.fullName = "Vui lòng nhập họ và tên";
+    if (!formData.email.trim()) errors.email = "Vui lòng nhập email";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
-      errors.email = "Enter a valid email address";
-    if (!formData.phone.trim()) errors.phone = "Phone number is required";
+      errors.email = "Email không hợp lệ";
+    if (!formData.phone.trim()) errors.phone = "Vui lòng nhập số điện thoại";
     return errors;
   };
 
@@ -177,7 +176,7 @@ const Booking = () => {
 
     if (!checkIn || !checkOut) {
       setFieldErrors({
-        _general: "Missing date information. Please go back and pick dates.",
+        _general: "Thiếu thông tin ngày lưu trú. Vui lòng quay lại và chọn ngày.",
       });
       return;
     }
@@ -192,6 +191,9 @@ const Booking = () => {
     setIsSubmitting(true);
 
     try {
+      const nameParts = formData.fullName.trim().split(/\s+/);
+      const firstName = nameParts.pop() || "";
+      const lastName = nameParts.join(" ");
       const bookingPayload = {
         hotelId,
         roomId,
@@ -201,8 +203,9 @@ const Booking = () => {
         numberOfGuests: guests,
         paymentMethod: PAYMENT_METHOD_MAP[paymentMethod] || "cash",
         guestInfo: {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
+          firstName,
+          lastName,
+          fullName: formData.fullName.trim(),
           email: formData.email,
           phone: formData.phone,
         },
@@ -211,6 +214,12 @@ const Booking = () => {
 
       const res = await api.createBooking(bookingPayload);
       const booking = res.data || res;
+      const paymentUrl = res.payment?.paymentUrl || booking.paymentUrl;
+
+      if (paymentUrl) {
+        window.location.assign(paymentUrl);
+        return;
+      }
 
       setBookingResult({
         _id: booking._id || booking.id || `BK-${Date.now()}`,
@@ -276,10 +285,10 @@ const Booking = () => {
                 <CheckCircle2 size={44} className="text-white" />
               </div>
               <h1 className="text-3xl font-bold text-white">
-                Booking Confirmed!
+                Đặt phòng thành công!
               </h1>
               <p className="text-white/80 text-base mt-2">
-                Your reservation has been created successfully
+                Yêu cầu đặt phòng của bạn đã được tạo thành công
               </p>
             </div>
 
@@ -287,7 +296,7 @@ const Booking = () => {
               <div className="bg-gray-50 rounded-xl p-5 space-y-4">
                 <div className="flex justify-between items-start">
                   <span className="text-sm font-medium text-gray-500 uppercase tracking-wide">
-                    Booking ID
+                    Mã đặt phòng
                   </span>
                   <span className="text-base font-mono font-semibold text-gray-800">
                     {bookingResult._id}
@@ -324,7 +333,7 @@ const Booking = () => {
                     Tổng thanh toán
                   </span>
                   <span className="text-2xl font-bold text-[#FF385C]">
-                    ${bookingResult.totalPrice}
+                    {formatVnd(bookingResult.totalPrice)}
                   </span>
                 </div>
               </div>
@@ -334,13 +343,13 @@ const Booking = () => {
                   onClick={() => navigate("/my-bookings")}
                   className="flex-1 py-3.5 bg-[#FF385C] text-white text-base font-semibold rounded-xl hover:bg-[#E31C5F] active:scale-[0.98] transition-all duration-150 cursor-pointer"
                 >
-                  View My Bookings
+                  Xem đặt phòng của tôi
                 </button>
                 <button
                   onClick={() => navigate("/")}
                   className="flex-1 py-3.5 border border-gray-300 text-gray-700 text-base font-semibold rounded-xl hover:bg-gray-50 active:scale-[0.98] transition-all duration-150 cursor-pointer"
                 >
-                  Back to Home
+                  Về trang chủ
                 </button>
               </div>
             </div>
@@ -359,11 +368,11 @@ const Booking = () => {
           className="mb-6 inline-flex items-center gap-2 text-base text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
         >
           <ArrowLeft size={18} />
-          <span>Back</span>
+          <span>Quay lại</span>
         </button>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-7">
-          Complete Your Booking
+          Hoàn tất đặt phòng
         </h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
@@ -384,50 +393,36 @@ const Booking = () => {
                     Thông tin khách
                   </h2>
                   <p className="text-sm text-gray-500">
-                    Enter the primary guest details
+                    Điền thông tin người nhận phòng chính
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <InputField
-                  label="First Name"
-                  icon={User}
-                  type="text"
-                  placeholder="Enter your first name"
-                  value={formData.firstName}
-                  onChange={(e) =>
-                    handleFieldChange("firstName", e.target.value)
-                  }
-                  error={fieldErrors.firstName}
-                />
-                <InputField
-                  label="Last Name"
-                  type="text"
-                  placeholder="Enter your last name"
-                  value={formData.lastName}
-                  onChange={(e) =>
-                    handleFieldChange("lastName", e.target.value)
-                  }
-                  error={fieldErrors.lastName}
-                />
-              </div>
+              <InputField
+                label="Họ và tên"
+                icon={User}
+                type="text"
+                placeholder="Nhập họ và tên"
+                value={formData.fullName}
+                onChange={(e) => handleFieldChange("fullName", e.target.value)}
+                error={fieldErrors.fullName}
+              />
 
               <InputField
-                label="Email Address"
+                label="Email"
                 icon={Mail}
                 type="email"
-                placeholder="Enter your email address"
+                placeholder="Nhập email"
                 value={formData.email}
                 onChange={(e) => handleFieldChange("email", e.target.value)}
                 error={fieldErrors.email}
               />
 
               <InputField
-                label="Phone Number"
+                label="Số điện thoại"
                 icon={Phone}
                 type="tel"
-                placeholder="Enter your phone number"
+                placeholder="Nhập số điện thoại"
                 value={formData.phone}
                 onChange={(e) => handleFieldChange("phone", e.target.value)}
                 error={fieldErrors.phone}
@@ -441,10 +436,10 @@ const Booking = () => {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">
-                    Payment Method
+                    Phương thức thanh toán
                   </h2>
                   <p className="text-sm text-gray-500">
-                    Choose how you want to pay
+                    Chọn cách bạn muốn thanh toán
                   </p>
                 </div>
               </div>
@@ -506,7 +501,7 @@ const Booking = () => {
 
             <div className="flex items-center gap-2 text-sm text-gray-500 px-1">
               <Shield size={15} className="text-gray-400 shrink-0" />
-              <span>Your payment information is encrypted and secure.</span>
+              <span>Thông tin thanh toán của bạn được mã hóa và bảo mật.</span>
             </div>
 
             <button
@@ -535,11 +530,11 @@ const Booking = () => {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                     />
                   </svg>
-                  Processing...
+                  Đang xử lý...
                 </>
               ) : (
                 <>
-                  Confirm Booking
+                  {paymentMethod === "pay_at_hotel" ? "Xác nhận đặt phòng" : "Tiếp tục thanh toán"}
                   <ChevronRight size={20} />
                 </>
               )}
@@ -570,7 +565,7 @@ const Booking = () => {
 
                 <div className="p-6 space-y-5">
                   <h2 className="text-lg font-semibold text-gray-900">
-                    Booking Summary
+                    Tóm tắt đặt phòng
                   </h2>
 
                   <div className="flex items-start gap-3">
@@ -593,13 +588,13 @@ const Booking = () => {
                       <Calendar size={18} className="text-gray-500" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm text-gray-500 mb-2">Stay Dates</p>
+                      <p className="text-sm text-gray-500 mb-2">Ngày lưu trú</p>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="bg-gray-50 rounded-lg p-3">
                           <p className="text-xs text-gray-400">Nhận phòng</p>
                           <p className="text-sm font-semibold text-gray-800 mt-0.5">
                             {checkIn
-                              ? new Date(checkIn).toLocaleDateString("en-US", {
+                              ? new Date(checkIn).toLocaleDateString("vi-VN", {
                                   month: "short",
                                   day: "numeric",
                                 })
@@ -610,7 +605,7 @@ const Booking = () => {
                           <p className="text-xs text-gray-400">Trả phòng</p>
                           <p className="text-sm font-semibold text-gray-800 mt-0.5">
                             {checkOut
-                              ? new Date(checkOut).toLocaleDateString("en-US", {
+                              ? new Date(checkOut).toLocaleDateString("vi-VN", {
                                   month: "short",
                                   day: "numeric",
                                 })
@@ -638,11 +633,11 @@ const Booking = () => {
                   <div className="space-y-2.5">
                     <div className="flex justify-between text-base">
                       <span className="text-gray-500">
-                        ${room.price} &times; {nights}{" "}
-                        {nights === 1 ? "night" : "nights"}
+                        {formatVnd(room.price)} &times; {nights}{" "}
+                        {nights === 1 ? "đêm" : "đêm"}
                       </span>
                       <span className="text-gray-700 font-medium">
-                        ${room.price * nights}
+                        {formatVnd(room.price * nights)}
                       </span>
                     </div>
                     <div className="flex justify-between text-base">
@@ -661,9 +656,9 @@ const Booking = () => {
                     </span>
                     <div className="text-right">
                       <span className="text-3xl font-bold text-[#FF385C]">
-                        ${totalPrice}
+                        {formatVnd(totalPrice)}
                       </span>
-                      <p className="text-sm text-gray-400">USD</p>
+                      <p className="text-sm text-gray-400">VNĐ</p>
                     </div>
                   </div>
                 </div>
@@ -677,10 +672,10 @@ const Booking = () => {
               />
               <div>
                 <p className="text-base font-medium text-[#FF385C]">
-                  Free Cancellation
+                  Hủy miễn phí
                 </p>
                 <p className="text-sm text-gray-600 mt-1">
-                  Cancel before check-in for a full refund.
+                  Hủy trước ngày nhận phòng để được hoàn tiền đầy đủ.
                 </p>
               </div>
             </div>

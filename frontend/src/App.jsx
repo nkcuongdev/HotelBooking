@@ -11,6 +11,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import MyBookings from "./pages/MyBookings";
+import PaymentResult from "./pages/PaymentResult";
 import Wishlist from "./pages/Wishlist";
 import Blog from "./pages/Blog";
 import BlogDetail from "./pages/BlogDetail";
@@ -40,6 +41,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/wishlist" element={<Wishlist />} />
+            <Route path="/payment-result" element={<PaymentResult />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:id" element={<BlogDetail />} />
             <Route path="/partnership" element={<Partnership />} />

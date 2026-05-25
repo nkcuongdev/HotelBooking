@@ -16,12 +16,14 @@ import {
   Loader2,
   ArrowLeft,
   PenLine,
+  CreditCard,
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ReviewForm from '../components/ReviewForm';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { formatVnd } from '../utils/currency';
 
 const statusConfig = {
   pending: {
@@ -95,6 +97,7 @@ const MyBookings = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [cancellingId, setCancellingId] = useState(null);
+  const [payingId, setPayingId] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -179,6 +182,21 @@ const MyBookings = () => {
       alert(err.message || 'Hủy đặt phòng thất bại');
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  const handlePayNow = async (id) => {
+    setPayingId(id);
+    try {
+      const res = await api.createBookingPayment(id);
+      const paymentUrl = res.payment?.paymentUrl || res.data?.paymentUrl;
+      if (!paymentUrl) {
+        throw new Error('Khong tao duoc duong dan thanh toan');
+      }
+      window.location.assign(paymentUrl);
+    } catch (err) {
+      alert(err.message || 'Tao phien thanh toan that bai');
+      setPayingId(null);
     }
   };
 
@@ -401,7 +419,7 @@ const MyBookings = () => {
                         <div className="text-right mr-4">
                           <span className="text-xs text-gray-400">Tổng tiền</span>
                           <p className="font-bold text-[#FF385C] text-lg">
-                            ${booking.amount.toLocaleString()}
+                            {formatVnd(booking.amount)}
                           </p>
                         </div>
                         <div className="flex gap-2 flex-wrap">
@@ -411,6 +429,22 @@ const MyBookings = () => {
                           >
                             Chi tiết
                           </button>
+                          {['vnpay', 'momo'].includes(booking.paymentMethod) &&
+                            ['pending', 'failed'].includes(booking.paymentStatus) &&
+                            !['cancelled', 'completed'].includes(booking.status) && (
+                              <button
+                                onClick={() => handlePayNow(booking.id)}
+                                disabled={payingId === booking.id}
+                                className="px-4 py-2 text-sm text-green-700 border border-green-200 rounded-lg hover:bg-green-50 cursor-pointer disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                              >
+                                {payingId === booking.id ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                  <CreditCard size={14} />
+                                )}
+                                Thanh toán
+                              </button>
+                            )}
                           {booking.status === 'completed' && !reviewedBookingIds.has(booking.rawId) && (
                             <button
                               onClick={() =>
@@ -544,7 +578,7 @@ const MyBookings = () => {
               <div className="flex items-center justify-between mt-5 pt-4 border-t border-gray-200">
                 <span className="text-gray-600 font-medium">Tổng tiền</span>
                 <span className="text-2xl font-bold text-[#FF385C]">
-                  ${selectedBooking.amount.toLocaleString()}
+                  {formatVnd(selectedBooking.amount)}
                 </span>
               </div>
 

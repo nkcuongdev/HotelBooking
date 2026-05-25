@@ -8,8 +8,11 @@ import {
   X,
   Loader2,
   CreditCard,
+  LogIn,
+  LogOut,
 } from "lucide-react";
 import api from "../../services/api";
+import { formatVnd } from "../../utils/currency";
 
 // ─── Normalize ────────────────────────────────────────────────────────────────
 const normalizeBooking = (b) => ({
@@ -32,6 +35,7 @@ const normalizeBooking = (b) => ({
 const STATUS_CONFIG = {
   pending: { label: "Chờ xác nhận", color: "bg-yellow-100 text-yellow-700" },
   confirmed: { label: "Đã xác nhận", color: "bg-blue-100 text-blue-700" },
+  checked_in: { label: "Đang ở", color: "bg-purple-100 text-purple-700" },
   completed: { label: "Hoàn thành", color: "bg-green-100 text-green-700" },
   cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-700" },
 };
@@ -48,7 +52,48 @@ const PAYMENT_METHOD_LABELS = {
   credit_card: "Thẻ tín dụng",
   debit_card: "Thẻ ghi nợ",
   paypal: "PayPal",
+  vnpay: "VNPAY",
+  momo: "MoMo",
   bank_transfer: "Chuyển khoản",
+};
+
+const canConfirmBooking = (booking) =>
+  booking.paymentMethod === "cash" || booking.paymentStatus === "paid";
+
+const CHECK_IN_HOUR = 14;
+const CHECK_OUT_HOUR = 12;
+
+const getStayDateTime = (date, hour) => {
+  if (!date) return null;
+  const value = new Date(date);
+  if (Number.isNaN(value.getTime())) return null;
+  value.setHours(hour, 0, 0, 0);
+  return value;
+};
+
+const formatStayTime = (date) =>
+  date.toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+const getCheckInBlockReason = (booking) => {
+  const earliestCheckIn = getStayDateTime(booking.checkIn, CHECK_IN_HOUR);
+  if (earliestCheckIn && new Date() < earliestCheckIn) {
+    return `Check-in từ ${formatStayTime(earliestCheckIn)}`;
+  }
+  return "";
+};
+
+const getCheckoutBlockReason = (booking) => {
+  const earliestCheckOut = getStayDateTime(booking.checkOut, CHECK_OUT_HOUR);
+  if (earliestCheckOut && new Date() < earliestCheckOut) {
+    return `Checkout từ ${formatStayTime(earliestCheckOut)}`;
+  }
+  return "";
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -119,7 +164,11 @@ const BookingsManagement = () => {
           res = await api.confirmBooking(id);
           updatedFields = { status: "confirmed" };
           break;
-        case "complete":
+        case "checkin":
+          res = await api.checkInBooking(id);
+          updatedFields = { status: "checked_in" };
+          break;
+        case "checkout":
           res = await api.checkOutBooking(id);
           updatedFields = { status: "completed" };
           // If pay at hotel, mark as paid
@@ -209,6 +258,7 @@ const BookingsManagement = () => {
     total: bookings.length,
     pending: bookings.filter((b) => b.status === "pending").length,
     confirmed: bookings.filter((b) => b.status === "confirmed").length,
+    checkedIn: bookings.filter((b) => b.status === "checked_in").length,
     completed: bookings.filter((b) => b.status === "completed").length,
     revenue: bookings
       .filter((b) => b.paymentStatus === "paid")
@@ -230,7 +280,7 @@ const BookingsManagement = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
           { label: "Tổng đơn", value: stats.total, color: "text-gray-900" },
           {
@@ -244,13 +294,18 @@ const BookingsManagement = () => {
             color: "text-blue-600",
           },
           {
+            label: "Đang ở",
+            value: stats.checkedIn,
+            color: "text-purple-600",
+          },
+          {
             label: "Hoàn thành",
             value: stats.completed,
             color: "text-green-600",
           },
           {
             label: "Doanh thu",
-            value: `$${stats.revenue.toLocaleString()}`,
+            value: formatVnd(stats.revenue),
             color: "text-[#FF385C]",
           },
         ].map((s) => (
@@ -294,6 +349,7 @@ const BookingsManagement = () => {
             <option value="">Tất cả trạng thái</option>
             <option value="pending">Chờ xác nhận</option>
             <option value="confirmed">Đã xác nhận</option>
+            <option value="checked_in">Đang ở</option>
             <option value="completed">Hoàn thành</option>
             <option value="cancelled">Đã hủy</option>
           </select>
@@ -410,6 +466,8 @@ const BookingsManagement = () => {
                       PAYMENT_CONFIG[booking.paymentStatus] ||
                       PAYMENT_CONFIG.pending;
                     const isLoading = actionLoading === booking.id;
+                    const checkInBlockReason = getCheckInBlockReason(booking);
+                    const checkoutBlockReason = getCheckoutBlockReason(booking);
                     return (
                       <tr
                         key={booking.id}
@@ -452,7 +510,7 @@ const BookingsManagement = () => {
                         </td>
                         <td className="px-5 py-4 text-right">
                           <p className="font-semibold text-gray-900">
-                            ${booking.amount.toLocaleString()}
+                            {formatVnd(booking.amount)}
                           </p>
                           <p className={`text-xs mt-0.5 ${pc.color}`}>
                             {pc.label}
@@ -503,7 +561,7 @@ const BookingsManagement = () => {
                                 </button>
 
                                 {/* Workflow actions */}
-                                {booking.status === "pending" && (
+                                {booking.status === "pending" && canConfirmBooking(booking) && (
                                   <button
                                     onClick={() =>
                                       handleAction(
@@ -517,19 +575,48 @@ const BookingsManagement = () => {
                                     <CheckCircle size={15} /> Xác nhận đặt phòng
                                   </button>
                                 )}
-                                {booking.status === "confirmed" && (
+                                {booking.status === "pending" && !canConfirmBooking(booking) && (
+                                  <div className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-400">
+                                    <CreditCard size={15} /> Chờ khách thanh toán
+                                  </div>
+                                )}
+                                {booking.status === "confirmed" && !checkInBlockReason && (
                                   <button
                                     onClick={() =>
                                       handleAction(
-                                        "complete",
+                                        "checkin",
+                                        booking.id,
+                                        "Check-in",
+                                      )
+                                    }
+                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-purple-600 hover:bg-purple-50 cursor-pointer"
+                                  >
+                                    <LogIn size={15} /> Check-in
+                                  </button>
+                                )}
+                                {booking.status === "confirmed" && checkInBlockReason && (
+                                  <div className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-400">
+                                    <LogIn size={15} /> {checkInBlockReason}
+                                  </div>
+                                )}
+                                {booking.status === "checked_in" && !checkoutBlockReason && (
+                                  <button
+                                    onClick={() =>
+                                      handleAction(
+                                        "checkout",
                                         booking.id,
                                         "Hoàn thành",
                                       )
                                     }
                                     className="flex items-center gap-2 w-full px-4 py-2 text-sm text-green-600 hover:bg-green-50 cursor-pointer"
                                   >
-                                    <CheckCircle size={15} /> Hoàn thành
+                                    <LogOut size={15} /> Hoàn thành
                                   </button>
+                                )}
+                                {booking.status === "checked_in" && checkoutBlockReason && (
+                                  <div className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-400">
+                                    <LogOut size={15} /> {checkoutBlockReason}
+                                  </div>
                                 )}
 
                                 {/* Mark paid (for cash pending) */}
@@ -702,14 +789,14 @@ const BookingsManagement = () => {
               <div className="flex justify-between pt-4 border-t border-gray-200">
                 <span className="font-medium text-gray-900">Tổng tiền</span>
                 <span className="text-xl font-bold text-[#FF385C]">
-                  ${selectedBooking.amount.toLocaleString()}
+                  {formatVnd(selectedBooking.amount)}
                 </span>
               </div>
             </div>
 
             {/* Action buttons in modal */}
             <div className="p-6 border-t border-gray-200 space-y-2">
-              {selectedBooking.status === "pending" && (
+              {selectedBooking.status === "pending" && canConfirmBooking(selectedBooking) && (
                 <button
                   onClick={() =>
                     handleAction("confirm", selectedBooking.id, "Xác nhận")
@@ -725,10 +812,36 @@ const BookingsManagement = () => {
                   Xác nhận đặt phòng
                 </button>
               )}
-              {selectedBooking.status === "confirmed" && (
+              {selectedBooking.status === "pending" && !canConfirmBooking(selectedBooking) && (
+                <div className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-500 font-medium rounded-lg">
+                  <CreditCard size={16} /> Chờ khách thanh toán
+                </div>
+              )}
+              {selectedBooking.status === "confirmed" && !getCheckInBlockReason(selectedBooking) && (
                 <button
                   onClick={() =>
-                    handleAction("complete", selectedBooking.id, "Hoàn thành")
+                    handleAction("checkin", selectedBooking.id, "Check-in")
+                  }
+                  disabled={actionLoading === selectedBooking.id}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 cursor-pointer disabled:opacity-60"
+                >
+                  {actionLoading === selectedBooking.id ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <LogIn size={16} />
+                  )}
+                  Check-in
+                </button>
+              )}
+              {selectedBooking.status === "confirmed" && getCheckInBlockReason(selectedBooking) && (
+                <div className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-500 font-medium rounded-lg">
+                  <LogIn size={16} /> {getCheckInBlockReason(selectedBooking)}
+                </div>
+              )}
+              {selectedBooking.status === "checked_in" && !getCheckoutBlockReason(selectedBooking) && (
+                <button
+                  onClick={() =>
+                    handleAction("checkout", selectedBooking.id, "Hoàn thành")
                   }
                   disabled={actionLoading === selectedBooking.id}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 cursor-pointer disabled:opacity-60"
@@ -736,10 +849,15 @@ const BookingsManagement = () => {
                   {actionLoading === selectedBooking.id ? (
                     <Loader2 size={16} className="animate-spin" />
                   ) : (
-                    <CheckCircle size={16} />
+                    <LogOut size={16} />
                   )}
                   Hoàn thành
                 </button>
+              )}
+              {selectedBooking.status === "checked_in" && getCheckoutBlockReason(selectedBooking) && (
+                <div className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-500 font-medium rounded-lg">
+                  <LogOut size={16} /> {getCheckoutBlockReason(selectedBooking)}
+                </div>
               )}
               {selectedBooking.paymentMethod === "cash" &&
                 selectedBooking.paymentStatus === "pending" &&

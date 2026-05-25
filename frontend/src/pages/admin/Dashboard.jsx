@@ -17,11 +17,14 @@ import {
   ChevronRight,
 } from "lucide-react";
 import api from "../../services/api";
+import { formatCompactVnd, formatVnd } from "../../utils/currency";
 
 const getStatusConfig = (status) => {
   switch (status) {
     case "confirmed":
       return { label: "Đã xác nhận", color: "bg-green-100 text-green-700", icon: CheckCircle };
+    case "checked_in":
+      return { label: "Đang ở", color: "bg-purple-100 text-purple-700", icon: CheckCircle };
     case "pending":
       return { label: "Chờ xử lý", color: "bg-amber-100 text-amber-700", icon: Clock };
     case "completed":
@@ -64,11 +67,11 @@ const StatCard = ({ title, value, icon: Icon, trend, trendValue, color, link }) 
 );
 
 const formatRevLabel = (value) => {
-  if (value === 0) return "$0";
-  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-  if (value >= 1000) return `$${(value / 1000).toFixed(1)}k`;
-  return `$${value}`;
+  return formatCompactVnd(value);
 };
+
+const canConfirmBooking = (booking) =>
+  booking.paymentMethod === "cash" || booking.paymentStatus === "paid";
 
 const BAR_MAX_HEIGHT = 140; // px
 
@@ -94,7 +97,7 @@ const MiniBarChart = ({ data }) => {
                     : "bg-gray-200"
                 }`}
                 style={{ height: barHeight }}
-                title={`${item.month}: $${item.revenue.toLocaleString()}`}
+                title={`${item.month}: ${formatVnd(item.revenue)}`}
               />
             </div>
             <span className="text-sm text-gray-500">{item.month}</span>
@@ -137,7 +140,7 @@ const Dashboard = () => {
         const userList = Array.isArray(users) ? users : [];
 
         const totalRevenue = bookingList
-          .filter((b) => b.status !== "cancelled")
+          .filter((b) => b.paymentStatus === "paid")
           .reduce((sum, b) => sum + (b.totalPrice || b.amount || 0), 0);
 
         const totalRooms = hotelList.reduce((sum, h) => sum + (h.totalRooms || 0), 0);
@@ -162,6 +165,8 @@ const Dashboard = () => {
           checkOut: b.checkOutDate || b.checkOut,
           totalPrice: b.totalPrice || b.amount || 0,
           status: b.status || "pending",
+          paymentStatus: b.paymentStatus || "pending",
+          paymentMethod: b.paymentMethod || "cash",
           createdAt: b.createdAt,
         }));
         setRecentBookings(recent);
@@ -169,7 +174,7 @@ const Dashboard = () => {
         // Build revenue map keyed by "YYYY-M" to handle year boundaries correctly
         const revenueByYearMonth = {};
         bookingList.forEach((b) => {
-          if (b.status === "cancelled") return;
+          if (b.paymentStatus !== "paid") return;
           const date = new Date(b.checkInDate || b.createdAt);
           if (isNaN(date)) return;
           const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
@@ -202,7 +207,7 @@ const Dashboard = () => {
 
   const handleConfirmBooking = async (bookingId) => {
     try {
-      await api.updateBooking(bookingId, { status: "confirmed" });
+      await api.confirmBooking(bookingId);
       setRecentBookings((prev) =>
         prev.map((b) => b._id === bookingId ? { ...b, status: "confirmed" } : b)
       );
@@ -305,7 +310,7 @@ const Dashboard = () => {
               <DollarSign size={20} className="text-[#FF385C]" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-[#FF385C]">${stats.revenue.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-[#FF385C]">{formatVnd(stats.revenue)}</p>
               <p className="text-sm text-gray-500">Doanh thu</p>
             </div>
           </div>
@@ -330,13 +335,13 @@ const Dashboard = () => {
               <div>
                 <p className="text-sm text-gray-500">Tổng 6 tháng</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  ${monthlyRevenue.reduce((sum, m) => sum + m.revenue, 0).toLocaleString()}
+                  {formatVnd(monthlyRevenue.reduce((sum, m) => sum + m.revenue, 0))}
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-500">Trung bình/tháng</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  ${Math.round(monthlyRevenue.reduce((sum, m) => sum + m.revenue, 0) / 6).toLocaleString()}
+                  {formatVnd(Math.round(monthlyRevenue.reduce((sum, m) => sum + m.revenue, 0) / 6))}
                 </p>
               </div>
             </div>
@@ -466,7 +471,7 @@ const Dashboard = () => {
                       </td>
                       <td className="px-6 py-4 hidden sm:table-cell">
                         <span className="font-semibold text-gray-900">
-                          ${booking.totalPrice}
+                          {formatVnd(booking.totalPrice)}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -500,13 +505,20 @@ const Dashboard = () => {
                               </Link>
                               {booking.status === "pending" && (
                                 <>
-                                  <button
-                                    onClick={() => handleConfirmBooking(booking._id)}
-                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-green-600 hover:bg-gray-50 cursor-pointer"
-                                  >
-                                    <CheckCircle size={16} />
-                                    Xác nhận
-                                  </button>
+                                  {canConfirmBooking(booking) ? (
+                                    <button
+                                      onClick={() => handleConfirmBooking(booking._id)}
+                                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-green-600 hover:bg-gray-50 cursor-pointer"
+                                    >
+                                      <CheckCircle size={16} />
+                                      Xác nhận
+                                    </button>
+                                  ) : (
+                                    <div className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-400">
+                                      <Clock size={16} />
+                                      Chờ thanh toán
+                                    </div>
+                                  )}
                                   <button
                                     onClick={() => handleCancelBooking(booking._id)}
                                     className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-50 cursor-pointer"

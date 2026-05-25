@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { roomAmenities, getIconComponent } from "../../data/amenities";
 import api from "../../services/api";
+import { formatVnd } from "../../utils/currency";
 
 const RoomsManagement = () => {
   const location = useLocation();
@@ -556,7 +557,7 @@ const RoomsManagement = () => {
                   </td>
                   <td className="px-6 py-4">
                     <span className="font-semibold text-gray-900">
-                      ${room.price}
+                      {formatVnd(room.price)}
                     </span>
                     <span className="text-sm text-gray-500">/đêm</span>
                   </td>
@@ -803,7 +804,7 @@ const RoomsManagement = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Giá ($/đêm)
+                    Giá (VNĐ/đêm)
                   </label>
                   <input
                     type="number"
@@ -1041,7 +1042,7 @@ const RoomsManagement = () => {
                 <div className="flex items-center gap-6">
                   <div>
                     <span className="text-3xl font-bold text-[#FF385C]">
-                      ${viewingRoom.price}
+                      {formatVnd(viewingRoom.price)}
                     </span>
                     <span className="text-gray-500">/đêm</span>
                   </div>

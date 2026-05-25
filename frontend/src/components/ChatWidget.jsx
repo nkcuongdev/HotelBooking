@@ -33,10 +33,16 @@ const ChatWidget = () => {
   const [adminTyping, setAdminTyping] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNewBadge, setShowNewBadge] = useState(false);
+  const [socketConnected, setSocketConnected] = useState(false);
 
   const scrollRef = useRef(null);
   const isNearBottomRef = useRef(true);
   const typingTimeoutRef = useRef(null);
+  const openRef = useRef(open);
+
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   const checkIsNearBottom = () => {
     const el = scrollRef.current;
@@ -86,38 +92,46 @@ const ChatWidget = () => {
 
     initChat();
 
+    const onConnect = () => setSocketConnected(true);
+    const onDisconnect = () => setSocketConnected(false);
+    setSocketConnected(!!socket.connected);
+
     const onMessage = (msg) => {
       setMessages((prev) => {
         if (prev.some((m) => m._id === msg._id)) return prev;
         return [...prev, msg];
       });
       if (msg.senderRole === "admin") {
-        if (!open || !isNearBottomRef.current) {
+        if (!openRef.current || !isNearBottomRef.current) {
           setShowNewBadge(true);
-          if (!open) setUnreadCount((c) => c + 1);
+          if (!openRef.current) setUnreadCount((c) => c + 1);
         }
       }
     };
 
     const onConvoUpdate = (convo) => {
       setConversation(convo);
-      if (!open) setUnreadCount(convo?.unreadByUser || 0);
+      if (!openRef.current) setUnreadCount(convo?.unreadByUser || 0);
     };
 
     const onTyping = ({ role, isTyping }) => {
       if (role === "admin") setAdminTyping(!!isTyping);
     };
 
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
     socket.on("chat:message", onMessage);
     socket.on("chat:conversation-updated", onConvoUpdate);
     socket.on("chat:typing", onTyping);
 
     return () => {
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
       socket.off("chat:message", onMessage);
       socket.off("chat:conversation-updated", onConvoUpdate);
       socket.off("chat:typing", onTyping);
     };
-  }, [isAuthenticated, isAdmin, initChat, open]);
+  }, [isAuthenticated, isAdmin, initChat]);
 
   // Join room when conversation available
   useEffect(() => {
@@ -150,6 +164,12 @@ const ChatWidget = () => {
       }
     }
   }, [open, conversation?._id]);
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(typingTimeoutRef.current);
+    };
+  }, []);
 
   const handleScroll = () => {
     isNearBottomRef.current = checkIsNearBottom();
@@ -237,8 +257,12 @@ const ChatWidget = () => {
               <div>
                 <div className="font-semibold text-sm">Hỗ trợ khách hàng</div>
                 <div className="text-[11px] text-white/80 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-green-400" />
-                  Đang trực tuyến
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      socketConnected ? "bg-green-400" : "bg-white/50"
+                    }`}
+                  />
+                  {socketConnected ? "Đang trực tuyến" : "Đang kết nối..."}
                 </div>
               </div>
             </div>

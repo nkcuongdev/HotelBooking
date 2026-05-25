@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { formatVnd } from "../utils/currency";
 
 const BookingCard = ({ hotel, selectedRoom }) => {
   const navigate = useNavigate();
@@ -65,7 +66,7 @@ const BookingCard = ({ hotel, selectedRoom }) => {
       <div className="flex items-baseline gap-2 mb-6">
         {selectedRoom ? (
           <>
-            <span className="text-2xl font-semibold">${basePrice}</span>
+            <span className="text-2xl font-semibold">{formatVnd(basePrice)}</span>
             <span className="text-gray-500">/ đêm</span>
           </>
         ) : (
@@ -169,9 +170,9 @@ const BookingCard = ({ hotel, selectedRoom }) => {
         <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
           <div className="flex justify-between text-gray-700">
             <span>
-              ${basePrice} x {nights} đêm
+              {formatVnd(basePrice)} x {nights} đêm
             </span>
-            <span>${totalPrice}</span>
+            <span>{formatVnd(totalPrice)}</span>
           </div>
           <div className="flex justify-between text-gray-700">
             <span>Thuế và phí</span>
@@ -179,7 +180,7 @@ const BookingCard = ({ hotel, selectedRoom }) => {
           </div>
           <div className="flex justify-between font-semibold pt-3 border-t border-gray-200">
             <span>Tổng cộng</span>
-            <span className="text-[#FF385C]">${totalPrice}</span>
+            <span className="text-[#FF385C]">{formatVnd(totalPrice)}</span>
           </div>
         </div>
       )}

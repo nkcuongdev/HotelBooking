@@ -11,6 +11,8 @@ import {
 import HotelGrid from "../components/HotelGrid";
 import api from "../services/api";
 
+const PRICE_MAX = 10000000;
+
 const Hotels = () => {
   const [searchParams] = useSearchParams();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -33,7 +35,7 @@ const Hotels = () => {
   }, [searchParams]);
 
   const [filters, setFilters] = useState({
-    priceRange: { min: 0, max: 1000 },
+    priceRange: { min: 0, max: PRICE_MAX },
     rating: null,
     cities: [],
   });
@@ -157,7 +159,7 @@ const Hotels = () => {
   const activeFiltersCount =
     (filters.rating ? 1 : 0) +
     filters.cities.length +
-    (filters.priceRange.min > 0 || filters.priceRange.max < 1000 ? 1 : 0);
+    (filters.priceRange.min > 0 || filters.priceRange.max < PRICE_MAX ? 1 : 0);
 
   return (
     <div className="min-h-screen bg-gray-50">

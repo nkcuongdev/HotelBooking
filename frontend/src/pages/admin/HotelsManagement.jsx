@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { hotelAmenities, getIconComponent } from "../../data/amenities";
 import api from "../../services/api";
+import { formatVnd } from "../../utils/currency";
 
 const HotelsManagement = () => {
   const navigate = useNavigate();
@@ -851,7 +852,7 @@ const HotelsManagement = () => {
                           )}
                           {room.price && (
                             <span className="text-xs font-semibold text-[#FF385C]">
-                              ${room.price.toLocaleString()}/đêm
+                              {formatVnd(room.price)}/đêm
                             </span>
                           )}
                           <span

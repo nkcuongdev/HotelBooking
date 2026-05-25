@@ -11,28 +11,31 @@ import {
 const Footer = () => {
   const footerLinks = {
     company: [
-      { name: "About Us", href: "/about" },
-      { name: "Careers", href: "/careers" },
-      { name: "Press", href: "/press" },
+      { name: "Về chúng tôi", href: "/about" },
+      { name: "Tuyển dụng", href: "/careers" },
+      { name: "Báo chí", href: "/press" },
       { name: "Blog", href: "/blog" },
     ],
     support: [
-      { name: "Help Center", href: "/help" },
-      { name: "Safety Information", href: "/safety" },
-      { name: "Cancellation Options", href: "/cancellation" },
-      { name: "Contact Us", href: "/contact" },
+      { name: "Trung tâm trợ giúp", href: "/help" },
+      { name: "Thông tin an toàn", href: "/safety" },
+      { name: "Chính sách hủy đặt phòng", href: "/cancellation" },
+      { name: "Liên hệ hỗ trợ", href: "/contact" },
     ],
     hosting: [
-      { name: "List Your Property", href: "/host" },
-      { name: "Host Resources", href: "/host/resources" },
-      { name: "Community Forum", href: "/community" },
-      { name: "Responsible Hosting", href: "/responsible-hosting" },
+      { name: "Đăng khách sạn của bạn", href: "/host" },
+      { name: "Tài nguyên đối tác", href: "/host/resources" },
+      { name: "Cộng đồng đối tác", href: "/community" },
+      {
+        name: "Kinh doanh lưu trú có trách nhiệm",
+        href: "/responsible-hosting",
+      },
     ],
     legal: [
-      { name: "Privacy Policy", href: "/privacy" },
-      { name: "Terms of Service", href: "/terms" },
-      { name: "Cookie Policy", href: "/cookies" },
-      { name: "Sitemap", href: "/sitemap" },
+      { name: "Chính sách bảo mật", href: "/privacy" },
+      { name: "Điều khoản dịch vụ", href: "/terms" },
+      { name: "Chính sách cookie", href: "/cookies" },
+      { name: "Sơ đồ trang", href: "/sitemap" },
     ],
   };
 
@@ -59,8 +62,8 @@ const Footer = () => {
               </span>
             </div>
             <p className="text-gray-400 text-sm mb-4">
-              Find and book the perfect hotel for your next adventure. Trusted
-              by millions of travelers worldwide.
+              Tìm và đặt khách sạn phù hợp cho chuyến đi tiếp theo của bạn. Được
+              hàng triệu du khách tin dùng.
             </p>
             <div className="flex gap-3">
               {socialLinks.map((social) => (
@@ -80,7 +83,7 @@ const Footer = () => {
 
           {/* Company */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Company</h4>
+            <h4 className="text-white font-semibold mb-4">Công ty</h4>
             <ul className="space-y-2">
               {footerLinks.company.map((link) => (
                 <li key={link.name}>
@@ -97,7 +100,7 @@ const Footer = () => {
 
           {/* Support */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Support</h4>
+            <h4 className="text-white font-semibold mb-4">Hỗ trợ</h4>
             <ul className="space-y-2">
               {footerLinks.support.map((link) => (
                 <li key={link.name}>
@@ -114,7 +117,7 @@ const Footer = () => {
 
           {/* Hosting */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Hosting</h4>
+            <h4 className="text-white font-semibold mb-4">Đối tác lưu trú</h4>
             <ul className="space-y-2">
               {footerLinks.hosting.map((link) => (
                 <li key={link.name}>
@@ -131,7 +134,7 @@ const Footer = () => {
 
           {/* Contact */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Contact</h4>
+            <h4 className="text-white font-semibold mb-4">Liên hệ</h4>
             <ul className="space-y-3">
               <li className="flex items-start gap-3">
                 <MapPin
@@ -139,16 +142,16 @@ const Footer = () => {
                   className="text-[#FF385C] mt-0.5 flex-shrink-0"
                 />
                 <span className="text-gray-400 text-sm">
-                  123 Travel Street, San Francisco, CA 94102
+                  123 Đường Du Lịch, Phường Bạch Mai, Hà Nội
                 </span>
               </li>
               <li className="flex items-center gap-3">
                 <Phone size={18} className="text-[#FF385C] flex-shrink-0" />
                 <a
-                  href="tel:+1234567890"
+                  href="tel:19001234"
                   className="text-gray-400 hover:text-white transition-colors cursor-pointer"
                 >
-                  +1 (234) 567-890
+                  1900 1234
                 </a>
               </li>
               <li className="flex items-center gap-3">
@@ -170,7 +173,7 @@ const Footer = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-gray-500 text-sm">
-              © 2026 HotelBooking. All rights reserved.
+              © 2026 HotelBooking. Bảo lưu mọi quyền.
             </p>
             <div className="flex flex-wrap items-center gap-4 text-sm">
               {footerLinks.legal.map((link, index) => (

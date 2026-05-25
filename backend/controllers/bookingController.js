@@ -1,6 +1,13 @@
 const Booking = require("../models/Booking");
 const Room = require("../models/Room");
 const asyncHandler = require("../utils/asyncHandler");
+const {
+  createMomoPayment,
+  createVnpayPaymentUrl,
+  getGatewayAmount,
+  verifyMomoParams,
+  verifyVnpayParams,
+} = require("../utils/paymentGateways");
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -13,6 +20,149 @@ const getDatesInRange = (startDate, endDate) => {
     start.setDate(start.getDate() + 1);
   }
   return dates;
+};
+
+const ONLINE_PAYMENT_METHODS = ["vnpay", "momo"];
+const CHECK_IN_HOUR = 14;
+const CHECK_OUT_HOUR = 12;
+
+const isOnlinePaymentMethod = (method) => ONLINE_PAYMENT_METHODS.includes(method);
+
+const releaseRoomIfReserved = async (booking) => {
+  if (booking.inventoryReleased) return;
+  await Room.findByIdAndUpdate(booking.roomId, { $inc: { availableRooms: 1 } });
+  booking.inventoryReleased = true;
+};
+
+const getStayDateTime = (date, hour) => {
+  const value = new Date(date);
+  if (Number.isNaN(value.getTime())) return null;
+  value.setHours(hour, 0, 0, 0);
+  return value;
+};
+
+const formatStayTime = (date) =>
+  date.toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+const getClientUrl = () =>
+  (process.env.CLIENT_URL || process.env.FRONTEND_URL || "http://localhost:5173").replace(
+    /\/$/,
+    ""
+  );
+
+const getApiUrl = () =>
+  (
+    process.env.API_PUBLIC_URL ||
+    process.env.SERVER_URL ||
+    `http://localhost:${process.env.PORT || 5000}`
+  ).replace(/\/$/, "");
+
+const getIpAddress = (req) => {
+  const forwardedFor = req.headers["x-forwarded-for"];
+  if (forwardedFor) return forwardedFor.split(",")[0].trim();
+  return req.socket?.remoteAddress || req.ip || "127.0.0.1";
+};
+
+const buildPaymentResultUrl = ({ gateway, bookingId, status, message }) => {
+  const params = new URLSearchParams({
+    gateway,
+    bookingId: bookingId || "",
+    status,
+    message: message || "",
+  });
+  return `${getClientUrl()}/payment-result?${params.toString()}`;
+};
+
+const createPaymentSession = async ({ booking, req }) => {
+  const gateway = booking.paymentMethod;
+  const apiUrl = getApiUrl();
+
+  if (gateway === "vnpay") {
+    return createVnpayPaymentUrl({
+      booking,
+      ipAddr: getIpAddress(req),
+      returnUrl: `${apiUrl}/api/v1/bookings/payments/vnpay-return`,
+    });
+  }
+
+  if (gateway === "momo") {
+    return createMomoPayment({
+      booking,
+      guestInfo: booking.guestInfo,
+      redirectUrl: `${apiUrl}/api/v1/bookings/payments/momo-return`,
+      ipnUrl: `${apiUrl}/api/v1/bookings/payments/momo-ipn`,
+    });
+  }
+
+  return null;
+};
+
+const persistPaymentSession = async (booking, payment) => {
+  if (!payment) return;
+
+  booking.paymentGateway = payment.gateway;
+  booking.paymentTransaction = {
+    ...(booking.paymentTransaction || {}),
+    orderId: payment.orderId,
+    requestId: payment.requestId,
+    amount: payment.amount,
+    rawResponse: payment.rawResponse,
+    createdAt: new Date(),
+  };
+  await booking.save();
+};
+
+const updateGatewayPayment = async ({ bookingId, gateway, amount, success, payload }) => {
+  const booking = await Booking.findById(bookingId);
+  if (!booking) {
+    return { ok: false, code: "not_found", message: "Không tìm thấy đặt phòng" };
+  }
+
+  const expectedAmount = getGatewayAmount(booking.totalPrice);
+  if (Number(amount) !== Number(expectedAmount)) {
+    return { ok: false, code: "invalid_amount", message: "Số tiền không hợp lệ", booking };
+  }
+
+  const alreadyPaid = booking.paymentStatus === "paid";
+  if (success && booking.status === "cancelled") {
+    return {
+      ok: false,
+      code: "invalid_state",
+      message: "Đặt phòng đã bị hủy, không thể ghi nhận thanh toán",
+      booking,
+    };
+  }
+
+  if (!alreadyPaid) {
+    booking.paymentGateway = gateway;
+    booking.paymentStatus = success ? "paid" : "failed";
+    if (!success && booking.status !== "cancelled") {
+      booking.status = "cancelled";
+      await releaseRoomIfReserved(booking);
+    }
+    booking.paymentTransaction = {
+      ...(booking.paymentTransaction || {}),
+      gateway,
+      amount: Number(amount),
+      transactionNo: payload.vnp_TransactionNo || payload.transId,
+      bankCode: payload.vnp_BankCode,
+      responseCode: payload.vnp_ResponseCode || payload.resultCode,
+      transactionStatus: payload.vnp_TransactionStatus,
+      requestId: payload.requestId || booking.paymentTransaction?.requestId,
+      rawResponse: payload,
+      ...(success ? { paidAt: new Date() } : {}),
+      ...(!success ? { failedAt: new Date() } : {}),
+    };
+    await booking.save();
+  }
+
+  return { ok: true, code: alreadyPaid ? "already_paid" : "updated", booking };
 };
 
 // ─── Workflow ────────────────────────────────────────────────────────────────
@@ -88,9 +238,8 @@ const createBooking = asyncHandler(async (req, res) => {
   const nights = getDatesInRange(checkIn, checkOut).length;
   const totalPrice = room.price * nights;
 
-  // Determine initial payment status based on method
-  const isOnlinePayment = ["credit_card", "debit_card", "paypal", "bank_transfer"].includes(paymentMethod);
-  const initialPaymentStatus = isOnlinePayment ? "paid" : "pending";
+  const resolvedPaymentMethod = paymentMethod || "cash";
+  const isOnlinePayment = ONLINE_PAYMENT_METHODS.includes(resolvedPaymentMethod);
 
   const booking = await Booking.create({
     userId,
@@ -102,20 +251,224 @@ const createBooking = asyncHandler(async (req, res) => {
     checkOutDate: checkOut,
     numberOfGuests: numberOfGuests || 1,
     totalPrice,
-    paymentMethod: paymentMethod || "cash",
-    paymentStatus: initialPaymentStatus,
+    paymentMethod: resolvedPaymentMethod,
+    paymentGateway: isOnlinePayment ? resolvedPaymentMethod : null,
+    paymentStatus: "pending",
     status: "pending",
+    inventoryReleased: false,
     guestInfo: guestInfo || {},
   });
 
   // Decrease available rooms
   await Room.findByIdAndUpdate(roomId, { $inc: { availableRooms: -1 } });
 
+  let payment = null;
+  if (isOnlinePayment) {
+    try {
+      payment = await createPaymentSession({ booking, req });
+      await persistPaymentSession(booking, payment);
+    } catch (error) {
+      booking.paymentStatus = "failed";
+      booking.status = "cancelled";
+      booking.inventoryReleased = true;
+      booking.paymentTransaction = {
+        ...(booking.paymentTransaction || {}),
+        error: error.message,
+        failedAt: new Date(),
+      };
+      await booking.save();
+      await Room.findByIdAndUpdate(roomId, { $inc: { availableRooms: 1 } });
+
+      return res.status(502).json({
+        success: false,
+        error: `Khong the tao phien thanh toan ${resolvedPaymentMethod.toUpperCase()}: ${error.message}`,
+      });
+    }
+  }
+
   res.status(201).json({
     success: true,
     message: "Đặt phòng thành công. Vui lòng chờ admin xác nhận.",
     data: booking,
+    payment,
   });
+});
+
+// @desc    Create a new online payment session for an existing booking
+// @route   POST /api/v1/bookings/:id/payments
+// @access  Private
+const createBookingPayment = asyncHandler(async (req, res) => {
+  const booking = await Booking.findById(req.params.id);
+
+  if (!booking) {
+    return res.status(404).json({ success: false, error: "Khong tim thay dat phong" });
+  }
+
+  const isOwner = booking.userId.toString() === req.user.userId;
+  const isAdmin = req.user.role === "admin";
+
+  if (!isOwner && !isAdmin) {
+    return res.status(403).json({ success: false, error: "Khong co quyen truy cap" });
+  }
+
+  if (!isOnlinePaymentMethod(booking.paymentMethod)) {
+    return res.status(400).json({ success: false, error: "Dat phong nay khong dung thanh toan online" });
+  }
+
+  if (booking.paymentStatus === "paid") {
+    return res.status(400).json({ success: false, error: "Dat phong da duoc thanh toan" });
+  }
+
+  if (["cancelled", "completed"].includes(booking.status)) {
+    return res.status(400).json({ success: false, error: "Khong the thanh toan dat phong da ket thuc" });
+  }
+
+  const payment = await createPaymentSession({ booking, req });
+  await persistPaymentSession(booking, payment);
+
+  res.status(200).json({
+    success: true,
+    data: booking,
+    payment,
+  });
+});
+
+// @desc    VNPAY browser return
+// @route   GET /api/v1/bookings/payments/vnpay-return
+// @access  Public
+const handleVnpayReturn = asyncHandler(async (req, res) => {
+  const params = req.query;
+  const bookingId = params.vnp_TxnRef;
+
+  if (!verifyVnpayParams(params)) {
+    return res.redirect(
+      buildPaymentResultUrl({
+        gateway: "vnpay",
+        bookingId,
+        status: "failed",
+        message: "Chu ky VNPAY khong hop le",
+      })
+    );
+  }
+
+  const success = params.vnp_ResponseCode === "00" && params.vnp_TransactionStatus === "00";
+  const result = await updateGatewayPayment({
+    bookingId,
+    gateway: "vnpay",
+    amount: Number(params.vnp_Amount || 0) / 100,
+    success,
+    payload: params,
+  });
+
+  res.redirect(
+    buildPaymentResultUrl({
+      gateway: "vnpay",
+      bookingId,
+      status: result.ok && success ? "success" : "failed",
+      message: result.ok ? params.vnp_ResponseCode || "" : result.message,
+    })
+  );
+});
+
+// @desc    VNPAY server callback
+// @route   GET /api/v1/bookings/payments/vnpay-ipn
+// @access  Public
+const handleVnpayIpn = asyncHandler(async (req, res) => {
+  const params = req.query;
+  const bookingId = params.vnp_TxnRef;
+
+  if (!verifyVnpayParams(params)) {
+    return res.status(200).json({ RspCode: "97", Message: "Invalid signature" });
+  }
+
+  const success = params.vnp_ResponseCode === "00" && params.vnp_TransactionStatus === "00";
+  const result = await updateGatewayPayment({
+    bookingId,
+    gateway: "vnpay",
+    amount: Number(params.vnp_Amount || 0) / 100,
+    success,
+    payload: params,
+  });
+
+  if (result.code === "not_found") {
+    return res.status(200).json({ RspCode: "01", Message: "Order not found" });
+  }
+
+  if (result.code === "invalid_amount") {
+    return res.status(200).json({ RspCode: "04", Message: "Invalid amount" });
+  }
+
+  if (result.code === "already_paid") {
+    return res.status(200).json({ RspCode: "02", Message: "Order already confirmed" });
+  }
+
+  if (!result.ok) {
+    return res.status(200).json({ RspCode: "99", Message: result.message || "Invalid state" });
+  }
+
+  res.status(200).json({ RspCode: "00", Message: "Confirm Success" });
+});
+
+// @desc    MoMo browser return
+// @route   GET /api/v1/bookings/payments/momo-return
+// @access  Public
+const handleMomoReturn = asyncHandler(async (req, res) => {
+  const params = req.query;
+  const bookingId = params.orderId;
+
+  if (!verifyMomoParams(params)) {
+    return res.redirect(
+      buildPaymentResultUrl({
+        gateway: "momo",
+        bookingId,
+        status: "failed",
+        message: "Chu ky MoMo khong hop le",
+      })
+    );
+  }
+
+  const success = Number(params.resultCode) === 0;
+  const result = await updateGatewayPayment({
+    bookingId,
+    gateway: "momo",
+    amount: params.amount,
+    success,
+    payload: params,
+  });
+
+  res.redirect(
+    buildPaymentResultUrl({
+      gateway: "momo",
+      bookingId,
+      status: result.ok && success ? "success" : "failed",
+      message: result.ok ? params.message || "" : result.message,
+    })
+  );
+});
+
+// @desc    MoMo server callback
+// @route   POST /api/v1/bookings/payments/momo-ipn
+// @access  Public
+const handleMomoIpn = asyncHandler(async (req, res) => {
+  const params = req.body;
+
+  if (!verifyMomoParams(params)) {
+    return res.status(400).json({ success: false, message: "Invalid signature" });
+  }
+
+  const result = await updateGatewayPayment({
+    bookingId: params.orderId,
+    gateway: "momo",
+    amount: params.amount,
+    success: Number(params.resultCode) === 0,
+    payload: params,
+  });
+
+  if (!result.ok) {
+    return res.status(400).json({ success: false, message: result.message });
+  }
+
+  res.status(200).json({ success: true, message: "Received" });
 });
 
 // @desc    Confirm booking (admin)
@@ -132,6 +485,13 @@ const confirmBooking = asyncHandler(async (req, res) => {
     return res.status(400).json({
       success: false,
       error: `Không thể xác nhận đặt phòng có trạng thái '${booking.status}'`,
+    });
+  }
+
+  if (isOnlinePaymentMethod(booking.paymentMethod) && booking.paymentStatus !== "paid") {
+    return res.status(400).json({
+      success: false,
+      error: "Chỉ có thể xác nhận đơn VNPAY/MoMo sau khi khách thanh toán thành công",
     });
   }
 
@@ -162,6 +522,21 @@ const checkInBooking = asyncHandler(async (req, res) => {
     });
   }
 
+  if (isOnlinePaymentMethod(booking.paymentMethod) && booking.paymentStatus !== "paid") {
+    return res.status(400).json({
+      success: false,
+      error: "Không thể check-in đơn thanh toán online chưa thành công",
+    });
+  }
+
+  const earliestCheckIn = getStayDateTime(booking.checkInDate, CHECK_IN_HOUR);
+  if (earliestCheckIn && new Date() < earliestCheckIn) {
+    return res.status(400).json({
+      success: false,
+      error: `Chỉ có thể check-in từ ${formatStayTime(earliestCheckIn)}`,
+    });
+  }
+
   booking.status = "checked_in";
   await booking.save();
 
@@ -189,15 +564,30 @@ const checkOutBooking = asyncHandler(async (req, res) => {
     });
   }
 
+  if (isOnlinePaymentMethod(booking.paymentMethod) && booking.paymentStatus !== "paid") {
+    return res.status(400).json({
+      success: false,
+      error: "Không thể hoàn thành đơn thanh toán online chưa thành công",
+    });
+  }
+
+  const earliestCheckOut = getStayDateTime(booking.checkOutDate, CHECK_OUT_HOUR);
+  if (earliestCheckOut && new Date() < earliestCheckOut) {
+    return res.status(400).json({
+      success: false,
+      error: `Chỉ có thể checkout từ ${formatStayTime(earliestCheckOut)}`,
+    });
+  }
+
   booking.status = "completed";
   // If pay at hotel, mark as paid on checkout
   if (booking.paymentMethod === "cash" && booking.paymentStatus === "pending") {
     booking.paymentStatus = "paid";
   }
-  await booking.save();
 
   // Release room back to inventory after checkout
-  await Room.findByIdAndUpdate(booking.roomId, { $inc: { availableRooms: 1 } });
+  await releaseRoomIfReserved(booking);
+  await booking.save();
 
   res.status(200).json({
     success: true,
@@ -238,12 +628,12 @@ const deleteBooking = asyncHandler(async (req, res) => {
   if (booking.paymentStatus === "paid") {
     booking.paymentStatus = "refunded";
   }
-  await booking.save();
 
   // Release room back to inventory
   if (wasActive) {
-    await Room.findByIdAndUpdate(booking.roomId, { $inc: { availableRooms: 1 } });
+    await releaseRoomIfReserved(booking);
   }
+  await booking.save();
 
   res.status(200).json({
     success: true,
@@ -390,6 +780,7 @@ const checkAvailability = asyncHandler(async (req, res) => {
 
 module.exports = {
   createBooking,
+  createBookingPayment,
   confirmBooking,
   checkInBooking,
   checkOutBooking,
@@ -399,4 +790,8 @@ module.exports = {
   getUserBookings,
   getBooking,
   checkAvailability,
+  handleMomoIpn,
+  handleMomoReturn,
+  handleVnpayIpn,
+  handleVnpayReturn,
 };

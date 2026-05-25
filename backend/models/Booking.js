@@ -45,8 +45,29 @@ const bookingSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["credit_card", "debit_card", "paypal", "cash", "bank_transfer"],
+      enum: [
+        "credit_card",
+        "debit_card",
+        "paypal",
+        "cash",
+        "bank_transfer",
+        "vnpay",
+        "momo",
+      ],
       default: "cash",
+    },
+    paymentGateway: {
+      type: String,
+      enum: ["vnpay", "momo", null],
+      default: null,
+    },
+    paymentTransaction: {
+      type: Object,
+      default: {},
+    },
+    inventoryReleased: {
+      type: Boolean,
+      default: false,
     },
     paymentStatus: {
       type: String,
