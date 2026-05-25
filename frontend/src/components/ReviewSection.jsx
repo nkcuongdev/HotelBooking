@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Loader2, PenLine } from 'lucide-react';
+import { AlertCircle, Loader2, PenLine, X } from 'lucide-react';
 import StarRating from './StarRating';
 import ReviewForm from './ReviewForm';
 import api from '../services/api';
@@ -38,6 +38,7 @@ const ReviewSection = ({ hotelId, hotelName = '' }) => {
   const [eligibleBookings, setEligibleBookings] = useState([]);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [eligibleLoading, setEligibleLoading] = useState(false);
+  const [notice, setNotice] = useState(null);
 
   const fetchReviews = useCallback(async () => {
     if (!hotelId) return;
@@ -59,8 +60,12 @@ const ReviewSection = ({ hotelId, hotelName = '' }) => {
   }, [fetchReviews]);
 
   const handleWriteReview = async () => {
+    setNotice(null);
     if (!isAuthenticated) {
-      alert('Vui lòng đăng nhập để đánh giá.');
+      setNotice({
+        type: 'warning',
+        message: 'Vui lòng đăng nhập để đánh giá.',
+      });
       return;
     }
     setEligibleLoading(true);
@@ -68,14 +73,21 @@ const ReviewSection = ({ hotelId, hotelName = '' }) => {
       const res = await api.getEligibleBookingsForReview(hotelId);
       const bookings = res.data || [];
       if (bookings.length === 0) {
-        alert('Bạn không có đặt phòng đã hoàn thành nào chưa được đánh giá tại khách sạn này.');
+        setNotice({
+          type: 'info',
+          message:
+            'Bạn không có đặt phòng đã hoàn thành nào chưa được đánh giá tại khách sạn này.',
+        });
         return;
       }
       setEligibleBookings(bookings);
       setSelectedBooking(bookings[0]);
       setShowForm(true);
     } catch (err) {
-      alert(err.message || 'Không thể kiểm tra điều kiện đánh giá.');
+      setNotice({
+        type: 'error',
+        message: err.message || 'Không thể kiểm tra điều kiện đánh giá.',
+      });
     } finally {
       setEligibleLoading(false);
     }
@@ -118,6 +130,30 @@ const ReviewSection = ({ hotelId, hotelName = '' }) => {
           </button>
         )}
       </div>
+
+      {notice && (
+        <div
+          className={`mb-5 flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${
+            notice.type === 'error'
+              ? 'border-red-200 bg-red-50 text-red-800'
+              : notice.type === 'warning'
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-blue-200 bg-blue-50 text-blue-800'
+          }`}
+          role="status"
+        >
+          <AlertCircle size={18} className="mt-0.5 shrink-0" />
+          <p className="flex-1 leading-6">{notice.message}</p>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="rounded-md p-1 hover:bg-black/5 cursor-pointer"
+            aria-label="Đóng thông báo"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Rating breakdown + average */}
       {total > 0 && (
