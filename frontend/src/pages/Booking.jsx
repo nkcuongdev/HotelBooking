@@ -19,6 +19,7 @@ import Navbar from "../components/Navbar";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { formatVnd } from "../utils/currency";
+import { formatBookingCode } from "../utils/booking";
 
 const PAYMENT_OPTIONS = [
   {
@@ -299,7 +300,7 @@ const Booking = () => {
                     Mã đặt phòng
                   </span>
                   <span className="text-base font-mono font-semibold text-gray-800">
-                    {bookingResult._id}
+                    {formatBookingCode(bookingResult._id)}
                   </span>
                 </div>
                 <div className="h-px bg-gray-200" />

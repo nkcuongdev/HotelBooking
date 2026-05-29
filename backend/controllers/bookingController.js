@@ -172,7 +172,7 @@ const updateGatewayPayment = async ({ bookingId, gateway, amount, success, paylo
 //  Admin confirms        → status: confirmed,  paymentStatus: unchanged
 //  Guest checks in       → status: checked_in, paymentStatus: unchanged
 //  Guest checks out      → status: completed,  paymentStatus: paid (if pay_at_hotel)
-//  User/Admin cancels    → status: cancelled,  paymentStatus: refunded (if was paid)
+//  User/Admin cancels before check-in → status: cancelled, paymentStatus: refunded (if was paid)
 //
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -622,7 +622,20 @@ const deleteBooking = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: "Không thể hủy đặt phòng đã hoàn thành" });
   }
 
-  const wasActive = ["pending", "confirmed", "checked_in"].includes(booking.status);
+  if (booking.status === "checked_in") {
+    return res.status(400).json({
+      success: false,
+      error: "Không thể hủy đặt phòng đã check-in. Vui lòng xử lý trả phòng sớm.",
+    });
+  }
+
+  const cancellableStatuses = ["pending", "confirmed"];
+  if (!cancellableStatuses.includes(booking.status)) {
+    return res.status(400).json({
+      success: false,
+      error: "Chỉ có thể hủy đặt phòng đang chờ xác nhận hoặc đã xác nhận",
+    });
+  }
 
   booking.status = "cancelled";
   // Refund if already paid
@@ -631,9 +644,7 @@ const deleteBooking = asyncHandler(async (req, res) => {
   }
 
   // Release room back to inventory
-  if (wasActive) {
-    await releaseRoomIfReserved(booking);
-  }
+  await releaseRoomIfReserved(booking);
   await booking.save();
 
   res.status(200).json({

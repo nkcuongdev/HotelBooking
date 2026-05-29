@@ -1,6 +1,7 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2, XCircle, Clock, ArrowRight } from "lucide-react";
 import Navbar from "../components/Navbar";
+import { formatBookingCode } from "../utils/booking";
 
 const gatewayLabels = {
   vnpay: "VNPAY",
@@ -49,7 +50,7 @@ const PaymentResult = () => {
                 <div className="flex justify-between gap-4">
                   <span className="text-sm text-gray-500">Mã đặt phòng</span>
                   <span className="font-mono font-semibold text-gray-900">
-                    #BK-{bookingId.slice(-6).toUpperCase()}
+                    {formatBookingCode(bookingId)}
                   </span>
                 </div>
               )}

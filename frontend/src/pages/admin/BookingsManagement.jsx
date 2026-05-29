@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import api from "../../services/api";
 import { formatVnd } from "../../utils/currency";
+import { formatBookingCode } from "../../utils/booking";
 
 // ─── Normalize ────────────────────────────────────────────────────────────────
 const normalizeBooking = (b) => ({
@@ -109,6 +110,8 @@ const BookingsManagement = () => {
   const [dateTo, setDateTo] = useState("");
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelError, setCancelError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -130,13 +133,20 @@ const BookingsManagement = () => {
   };
 
   // ─── Actions ────────────────────────────────────────────────────────────────
+  const openCancelConfirm = (booking) => {
+    setActiveDropdown(null);
+    setCancelError("");
+    setCancelTarget(booking);
+  };
+
+  const closeCancelConfirm = () => {
+    if (actionLoading) return;
+    setCancelError("");
+    setCancelTarget(null);
+  };
+
   const handleAction = async (action, id, label) => {
     setActiveDropdown(null);
-    if (
-      action === "cancel" &&
-      !window.confirm(`Bạn có chắc muốn hủy đặt phòng này?`)
-    )
-      return;
 
     setActionLoading(id);
     try {
@@ -151,9 +161,7 @@ const BookingsManagement = () => {
           const now = new Date();
           now.setHours(0, 0, 0, 0);
           if (checkInDate <= now) {
-            alert(
-              "Không thể hủy đặt phòng đã xác nhận khi đã qua ngày check-in.",
-            );
+            setCancelError("Không thể hủy đặt phòng đã xác nhận khi đã qua ngày check-in.");
             return;
           }
         }
@@ -200,8 +208,16 @@ const BookingsManagement = () => {
       if (selectedBooking?.id === id) {
         setSelectedBooking((prev) => ({ ...prev, ...updatedFields }));
       }
+      if (action === "cancel") {
+        setCancelError("");
+        setCancelTarget(null);
+      }
     } catch (err) {
-      alert(err.message || `${label || "Thao tác"} thất bại`);
+      if (action === "cancel") {
+        setCancelError(err.message || "Hủy đặt phòng thất bại");
+      } else {
+        alert(err.message || `${label || "Thao tác"} thất bại`);
+      }
     } finally {
       setActionLoading(null);
     }
@@ -211,7 +227,7 @@ const BookingsManagement = () => {
   const hotelNames = [...new Set(bookings.map((b) => b.hotel).filter(Boolean))];
 
   const filteredBookings = bookings.filter((b) => {
-    const shortCode = `BK-${b.id?.slice(-6).toUpperCase()}`;
+    const shortCode = formatBookingCode(b.id);
     const matchSearch =
       b.guest.toLowerCase().includes(searchTerm.toLowerCase()) ||
       b.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -475,7 +491,7 @@ const BookingsManagement = () => {
                       >
                         <td className="px-5 py-4">
                           <p className="font-mono font-semibold text-gray-700 text-xs">
-                            #BK-{booking.id?.slice(-6).toUpperCase()}
+                            {formatBookingCode(booking.id)}
                           </p>
                           <p className="text-sm font-medium text-gray-800 mt-0.5">
                             {booking.guest}
@@ -645,13 +661,7 @@ const BookingsManagement = () => {
                                   <>
                                     <div className="border-t border-gray-100 my-1" />
                                     <button
-                                      onClick={() =>
-                                        handleAction(
-                                          "cancel",
-                                          booking.id,
-                                          "Hủy",
-                                        )
-                                      }
+                                      onClick={() => openCancelConfirm(booking)}
                                       className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 cursor-pointer"
                                     >
                                       <XCircle size={15} /> Hủy đặt phòng
@@ -738,7 +748,7 @@ const BookingsManagement = () => {
 
             <div className="p-6 space-y-3 text-sm">
               {[
-                { label: "Mã đặt phòng", value: `#BK-${selectedBooking.id?.slice(-6).toUpperCase()}` },
+                { label: "Mã đặt phòng", value: formatBookingCode(selectedBooking.id) },
                 { label: "Khách hàng", value: selectedBooking.guest },
                 { label: "Email", value: selectedBooking.email },
                 { label: "Khách sạn", value: selectedBooking.hotel },
@@ -878,9 +888,7 @@ const BookingsManagement = () => {
                 )}
               {["pending", "confirmed"].includes(selectedBooking.status) && (
                 <button
-                  onClick={() =>
-                    handleAction("cancel", selectedBooking.id, "Hủy")
-                  }
+                  onClick={() => openCancelConfirm(selectedBooking)}
                   disabled={actionLoading === selectedBooking.id}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-red-200 text-red-600 font-medium rounded-lg hover:bg-red-50 cursor-pointer disabled:opacity-60"
                 >
@@ -893,6 +901,83 @@ const BookingsManagement = () => {
               >
                 Đóng
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cancelTarget && (
+        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-gray-100">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Xác nhận hủy đặt phòng</h3>
+                <p className="text-sm text-gray-500 mt-1">Thao tác này sẽ chuyển booking sang trạng thái đã hủy.</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeCancelConfirm}
+                disabled={Boolean(actionLoading)}
+                className="p-2 rounded-full hover:bg-gray-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Đóng"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm">
+                <div className="flex justify-between gap-4">
+                  <span className="text-gray-500">Khách</span>
+                  <span className="font-medium text-gray-900 text-right">{cancelTarget.guest}</span>
+                </div>
+                <div className="flex justify-between gap-4 mt-2">
+                  <span className="text-gray-500">Khách sạn</span>
+                  <span className="font-medium text-gray-900 text-right">{cancelTarget.hotel}</span>
+                </div>
+                <div className="flex justify-between gap-4 mt-2">
+                  <span className="text-gray-500">Phòng</span>
+                  <span className="font-medium text-gray-900 text-right">{cancelTarget.room}</span>
+                </div>
+                <div className="flex justify-between gap-4 mt-2">
+                  <span className="text-gray-500">Mã đặt phòng</span>
+                  <span className="font-mono font-semibold text-gray-900">
+                    {formatBookingCode(cancelTarget.id)}
+                  </span>
+                </div>
+              </div>
+
+              {cancelError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {cancelError}
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={closeCancelConfirm}
+                  disabled={Boolean(actionLoading)}
+                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl font-medium hover:bg-gray-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Giữ đặt phòng
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAction("cancel", cancelTarget.id, "Hủy")}
+                  disabled={Boolean(actionLoading)}
+                  className="flex-1 px-4 py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  {actionLoading === cancelTarget.id ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Đang hủy...
+                    </>
+                  ) : (
+                    "Xác nhận hủy"
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

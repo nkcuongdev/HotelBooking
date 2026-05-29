@@ -24,6 +24,7 @@ import ReviewForm from '../components/ReviewForm';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { formatVnd } from '../utils/currency';
+import { formatBookingCode } from '../utils/booking';
 
 const statusConfig = {
   pending: {
@@ -91,11 +92,16 @@ const normalizeBooking = (b) => {
   };
 };
 
+const CANCELLABLE_STATUSES = ['pending', 'confirmed'];
+const canCancelBooking = (booking) => CANCELLABLE_STATUSES.includes(booking?.status);
+
 const MyBookings = () => {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelError, setCancelError] = useState('');
   const [cancellingId, setCancellingId] = useState(null);
   const [payingId, setPayingId] = useState(null);
   const [bookings, setBookings] = useState([]);
@@ -144,7 +150,7 @@ const MyBookings = () => {
   const hasActiveFilters = statusFilter !== '';
 
   const filteredBookings = bookings.filter((b) => {
-    const shortCode = `BK-${b.id?.slice(-6).toUpperCase()}`;
+    const shortCode = formatBookingCode(b.id);
     const matchSearch =
       b.hotel.toLowerCase().includes(searchTerm.toLowerCase()) ||
       b.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -162,8 +168,21 @@ const MyBookings = () => {
     cancelled: bookings.filter((b) => b.status === 'cancelled').length,
   };
 
-  const handleCancel = async (id) => {
-    if (!window.confirm('Bạn có chắc muốn hủy đặt phòng này?')) return;
+  const openCancelConfirm = (booking) => {
+    setCancelError('');
+    setCancelTarget(booking);
+  };
+
+  const closeCancelConfirm = () => {
+    if (cancellingId) return;
+    setCancelError('');
+    setCancelTarget(null);
+  };
+
+  const handleCancel = async () => {
+    if (!cancelTarget) return;
+
+    const id = cancelTarget.id;
     setCancellingId(id);
     try {
       await api.cancelBooking(id);
@@ -178,8 +197,9 @@ const MyBookings = () => {
       if (selectedBooking?.id === id) {
         setSelectedBooking((prev) => ({ ...prev, ...updatedFields }));
       }
+      setCancelTarget(null);
     } catch (err) {
-      alert(err.message || 'Hủy đặt phòng thất bại');
+      setCancelError(err.message || 'Hủy đặt phòng thất bại');
     } finally {
       setCancellingId(null);
     }
@@ -414,7 +434,7 @@ const MyBookings = () => {
                           <span className="text-xs text-gray-400 uppercase tracking-wide">
                             Mã đặt phòng
                           </span>
-                          <p className="font-mono font-semibold text-gray-900 text-sm">#BK-{booking.id?.slice(-6).toUpperCase()}</p>
+                          <p className="font-mono font-semibold text-gray-900 text-sm">{formatBookingCode(booking.id)}</p>
                         </div>
                         <div className="text-right mr-4">
                           <span className="text-xs text-gray-400">Tổng tiền</span>
@@ -471,9 +491,9 @@ const MyBookings = () => {
                               Đã đánh giá
                             </span>
                           )}
-                          {['pending', 'confirmed', 'checked_in'].includes(booking.status) && (
+                          {canCancelBooking(booking) && (
                             <button
-                              onClick={() => handleCancel(booking.id)}
+                              onClick={() => openCancelConfirm(booking)}
                               disabled={cancellingId === booking.id}
                               className="px-4 py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 cursor-pointer disabled:opacity-50 transition-colors flex items-center gap-1.5"
                             >
@@ -540,7 +560,7 @@ const MyBookings = () => {
 
               <div className="space-y-3 text-sm">
                 {[
-                  { label: 'Mã đặt phòng', value: `#BK-${selectedBooking.id?.slice(-6).toUpperCase()}` },
+                  { label: 'Mã đặt phòng', value: formatBookingCode(selectedBooking.id) },
                   selectedBooking.city && { label: 'Thành phố', value: selectedBooking.city },
                   selectedBooking.checkIn && {
                     label: 'Nhận phòng',
@@ -610,9 +630,9 @@ const MyBookings = () => {
                     Viết đánh giá
                   </button>
                 )}
-                {['pending', 'confirmed', 'checked_in'].includes(selectedBooking.status) && (
+                {canCancelBooking(selectedBooking) && (
                   <button
-                    onClick={() => handleCancel(selectedBooking.id)}
+                    onClick={() => openCancelConfirm(selectedBooking)}
                     disabled={cancellingId === selectedBooking.id}
                     className="flex-1 px-4 py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 cursor-pointer disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
                   >
@@ -626,6 +646,79 @@ const MyBookings = () => {
                     )}
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cancelTarget && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+            <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-gray-100">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Xác nhận hủy đặt phòng</h3>
+                <p className="text-sm text-gray-500 mt-1">Thao tác này sẽ hủy đặt phòng của bạn.</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeCancelConfirm}
+                disabled={Boolean(cancellingId)}
+                className="p-2 rounded-full hover:bg-gray-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Đóng"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm">
+                <div className="flex justify-between gap-4">
+                  <span className="text-gray-500">Khách sạn</span>
+                  <span className="font-medium text-gray-900 text-right">{cancelTarget.hotel}</span>
+                </div>
+                <div className="flex justify-between gap-4 mt-2">
+                  <span className="text-gray-500">Phòng</span>
+                  <span className="font-medium text-gray-900 text-right">{cancelTarget.room}</span>
+                </div>
+                <div className="flex justify-between gap-4 mt-2">
+                  <span className="text-gray-500">Mã đặt phòng</span>
+                  <span className="font-mono font-semibold text-gray-900">
+                    {formatBookingCode(cancelTarget.id)}
+                  </span>
+                </div>
+              </div>
+
+              {cancelError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {cancelError}
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={closeCancelConfirm}
+                  disabled={Boolean(cancellingId)}
+                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl font-medium hover:bg-gray-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Giữ đặt phòng
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  disabled={Boolean(cancellingId)}
+                  className="flex-1 px-4 py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  {cancellingId === cancelTarget.id ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Đang hủy...
+                    </>
+                  ) : (
+                    'Xác nhận hủy'
+                  )}
+                </button>
               </div>
             </div>
           </div>
